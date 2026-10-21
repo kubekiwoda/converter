@@ -1,46 +1,89 @@
 # Konwerter plików
 
-Konwerter obrazów, wideo i audio działający w 100% w przeglądarce – bez backendu, bez wysyłania plików na serwer i bez limitów rozmiaru (ograniczeniem jest tylko pamięć urządzenia). Hostowany statycznie na GitHub Pages.
+**Darmowy konwerter obrazów, filmów i muzyki, który działa w całości w Twojej przeglądarce.**
 
-## Obsługiwane konwersje
+👉 **Otwórz: https://kubekiwoda.github.io/converter/**
 
-| Źródło | Formaty docelowe | Silnik |
-| --- | --- | --- |
-| PNG, JPG, WEBP, GIF | PNG, JPG, WEBP, GIF (w każdą stronę) | `OffscreenCanvas` w Web Workerze + [`gifenc`](https://github.com/mattdesl/gifenc) |
-| MP4, MOV, WEBM, MKV, AVI… | MP3, WAV, animowany GIF z fragmentu | [`ffmpeg.wasm`](https://github.com/ffmpegwasm/ffmpeg.wasm) |
-| MP3, WAV, M4A, FLAC, OGG… | MP3, WAV | `ffmpeg.wasm` |
+Nic nie instalujesz, nie zakładasz konta i nie wysyłasz plików na żaden serwer. Wszystko dzieje się na Twoim komputerze lub telefonie.
 
-Typ pliku rozpoznawany jest po sygnaturze (magic bytes), a nie tylko po rozszerzeniu – interfejs pokazuje tylko te formaty, które mają sens dla danego pliku.
+---
 
-## Jak to działa
+## Co potrafi?
 
-- **Obrazy** są dekodowane i kodowane w osobnym wątku (`src/workers/image.worker.ts`), więc UI się nie blokuje. GIF powstaje przez kwantyzację do palety 256 kolorów (z 1-bitową przezroczystością). Gdy przeglądarka nie potrafi zakodować WEBP w canvasie (Safari), używany jest `libwebp` z FFmpeg.
-- **Audio/wideo** przetwarza `ffmpeg.wasm`. Plik wejściowy jest montowany przez `WORKERFS`, czyli czytany bezpośrednio z dysku – nie jest kopiowany w całości do pamięci WebAssembly. Rdzeń (~31 MB) pobierany jest dopiero przy pierwszej konwersji A/V, z paskiem postępu.
-- **Wielowątkowość**: rdzeń `@ffmpeg/core-mt` wymaga `SharedArrayBuffer`, a ten – izolacji cross-origin (nagłówki COOP/COEP). GitHub Pages nie pozwala ustawić nagłówków, więc dokłada je [`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker) (`public/coi-serviceworker.js`, ładowany jako pierwszy skrypt w `index.html`; przy pierwszej wizycie strona przeładowuje się raz).
-- **Bezpieczniki MT**: liczba wątków FFmpeg jest jawnie ograniczana (pula rdzenia MT ma 32 wątki – domyślne `threads=auto` potrafi ją wyczerpać i zawiesić pracę). Jeśli rdzeń MT nie wystartuje lub przestanie raportować postęp przez 30 s, zadanie jest automatycznie powtarzane na rdzeniu jednowątkowym. Bez izolacji (np. tryb prywatny Firefoksa) od razu używany jest rdzeń jednowątkowy.
+### 🖼️ Obrazy
 
-## Rozwój
+Zamienia obrazy między formatami **PNG, JPG, WEBP i GIF** – w dowolną stronę.
 
-Wymagany Node.js ≥ 20.19 (zalecany 24 – patrz `.nvmrc`).
+Przykłady: zdjęcie JPG → PNG, zrzut ekranu PNG → mniejszy WEBP, logo PNG → GIF.
 
-```bash
-npm ci
-npm run dev       # serwer deweloperski (z nagłówkami COOP/COEP)
-npm run check     # typecheck (tsc -b) + ESLint
-npm run build     # typecheck + build produkcyjny do dist/
-npm run preview   # podgląd builda BEZ nagłówków – zachowuje się jak GitHub Pages
-```
+### 🎬 Filmy
 
-`base: './'` w `vite.config.ts` sprawia, że build działa w dowolnym podkatalogu (`https://<user>.github.io/<repo>/`).
+- **Wyciąga dźwięk z filmu** – np. z pliku MP4 zrobisz plik MP3 albo WAV.
+- **Robi animowanego GIF-a z fragmentu filmu** – wybierasz, od której sekundy i jak długo.
 
-## Deploy na GitHub Pages
+Obsługiwane filmy: MP4, MOV, WEBM, MKV, AVI i inne popularne formaty.
 
-Workflow `.github/workflows/deploy.yml` przy każdym pushu na `main` uruchamia lint, typecheck, build i publikuje `dist/` na GitHub Pages.
+### 🎵 Muzyka i dźwięk
 
-Jednorazowo w repozytorium: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Zamienia pliki audio (WAV, M4A, FLAC, OGG i inne) na **MP3** lub **WAV**.
+
+---
+
+## Jak tego używać?
+
+1. Wejdź na stronę: **https://kubekiwoda.github.io/converter/**
+2. **Przeciągnij plik** na stronę albo kliknij i wybierz go z dysku. Obrazek możesz też po prostu wkleić (Ctrl+V).
+3. Strona sama rozpozna, co to za plik, i pokaże, na co można go zamienić. **Wybierz format.**
+4. Kliknij **„Konwertuj”** i poczekaj, aż pasek postępu dojdzie do końca.
+5. Kliknij **„Pobierz plik”** – gotowe!
+
+---
+
+## Najczęstsze pytania
+
+**Czy moje pliki są bezpieczne?**
+Tak. Pliki nigdy nie opuszczają Twojego urządzenia – nie są nigdzie wysyłane ani zapisywane. Strona pobiera z internetu tylko samą siebie (i raz „silnik” do filmów), a nie Twoje pliki.
+
+**Czy są jakieś limity rozmiaru?**
+Nie ma sztucznych limitów. Jedynym ograniczeniem jest pamięć Twojego komputera – bardzo duże filmy mogą się nie zmieścić na słabszym sprzęcie lub telefonie.
+
+**Dlaczego pierwsza konwersja filmu trwa dłużej?**
+Za pierwszym razem przeglądarka pobiera „silnik” do obróbki filmów i dźwięku (około 31 MB). Potem jest on zapamiętany i kolejne konwersje startują od razu.
+
+**Przy pierwszym wejściu strona sama się odświeżyła. Czy to normalne?**
+Tak. Strona robi to jeden raz, żeby włączyć szybszy, wielowątkowy tryb pracy.
+
+**Czy to kosztuje?**
+Nie. Projekt jest darmowy i otwarty (licencja MIT).
+
+**Jaka przeglądarka?**
+Najlepiej aktualny Chrome, Edge, Brave, Firefox lub Safari.
+
+---
 
 ## Ograniczenia
 
-- Z animowanych GIF/WEBP przy konwersji na inny format obrazu zapisywana jest pierwsza klatka.
-- GIF z wideo: maksymalnie 30 s fragmentu (wszystkie klatki trafiają do pamięci przy liczeniu palety).
-- Plik wynikowy powstaje w pamięci WebAssembly (limit rzędu 2 GB) – nie dotyczy to pliku wejściowego.
+- Jeśli zamieniasz **animowany** GIF lub WEBP na inny format obrazu, zapisze się tylko jego **pierwsza klatka**.
+- GIF z filmu może mieć maksymalnie **30 sekund** (dłuższe GIF-y byłyby ogromne).
+- Format JPG nie obsługuje przezroczystości – przezroczyste tło zamieni się na **białe**.
+
+---
+
+<details>
+<summary><b>Dla programistów</b> – jak uruchomić projekt u siebie</summary>
+
+Potrzebujesz [Node.js](https://nodejs.org/) w wersji 20.19 lub nowszej (zalecana 24).
+
+```bash
+npm ci            # instalacja zależności
+npm run dev       # wersja deweloperska pod http://localhost:5173
+npm run check     # sprawdzenie typów i lint
+npm run build     # wersja produkcyjna do folderu dist/
+npm run preview   # podgląd wersji produkcyjnej (zachowuje się jak GitHub Pages)
+```
+
+**Z czego jest zbudowany:** Vite, Tailwind CSS, TypeScript. Obrazy są przetwarzane przez `OffscreenCanvas` w osobnym wątku (GIF-y koduje [`gifenc`](https://github.com/mattdesl/gifenc)), a filmy i dźwięk przez [`ffmpeg.wasm`](https://github.com/ffmpegwasm/ffmpeg.wasm). Szybszy tryb wielowątkowy wymaga specjalnych nagłówków, których GitHub Pages nie pozwala ustawić – dodaje je [`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker). Gdy to niemożliwe, aplikacja sama przełącza się na tryb jednowątkowy.
+
+**Publikacja:** każdy push na gałąź `main` automatycznie buduje i publikuje stronę (`.github/workflows/deploy.yml`). W ustawieniach repozytorium musi być włączone **Settings → Pages → Source: GitHub Actions**.
+
+</details>
